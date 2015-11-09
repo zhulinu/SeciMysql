@@ -1,4 +1,2 @@
-mysqlsniffer
-============
-
-My little fork of http://hackmysql.com/mysqlsniffer
+secimysql
+add syslog to mysqlsniffer

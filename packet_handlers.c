@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include "mysql_defines.h"
 #include "user_defines.h"
 #include "state_map.h"
@@ -12,6 +13,7 @@
 
 extern struct st_options op;      // Declared in mysqlsniffer.h
 extern tag_id *tag;               // Declared in mysqlsniffer.h
+extern char strmsg[];
 
 // MySQL server > client connection handshake pkt
 int pkt_handshake_server(u_char *pkt, u_int len)
@@ -89,6 +91,15 @@ int pkt_handshake_client(u_char *pkt, u_int len)
 
    printf("Handshake (%s auth) <user %s db %s max pkt %u> ",
             (caps & CLIENT_SECURE_CONNECTION ? "new" : "old"), user, db, max_pkt);
+
+   char strtmp[100]="";
+   sprintf(strtmp, "loginin user=%s db=%s", user,db);
+   strcat(strmsg,strtmp);
+
+   openlog("seci-mysql",  LOG_PID, LOG_LOCAL0 );
+   syslog(LOG_INFO, "%s",  strmsg);
+   closelog();
+
    if(op.verbose) unmask_caps(caps);
 
    return PKT_HANDLED;
@@ -213,7 +224,15 @@ int pkt_com_x(u_char *pkt, u_int len)
 
    printf("COM_%s", command_name[*pkt]);
 
-   if(tag->event == COM_QUIT) remove_tag(tag);
+   if(tag->event == COM_QUIT){
+      char strtmp[100]="loginout";
+      strcat(strmsg,strtmp);
+
+      openlog("seci-mysql",  LOG_PID, LOG_LOCAL0 );
+      syslog(LOG_INFO, "%s",  strmsg);
+      closelog();
+      remove_tag(tag);
+   }
 
    return PKT_HANDLED;
 }
@@ -239,6 +258,13 @@ int pkt_com_x_string(u_char *pkt, u_int len)
    if(!pkt_match_event) return PKT_WRONG_TYPE;
 
    printf("COM_%s: %s", command_name[*pkt], get_arg(pkt, len));
+   char strtmp[5000]="";
+   sprintf(strtmp, "%s: %s", command_name[*pkt],get_arg(pkt, len));
+   strcat(strmsg,strtmp);
+
+   openlog("seci-mysql",  LOG_PID, LOG_LOCAL0 );
+   syslog(LOG_INFO, "%s",  strmsg);
+   closelog();
 
    return PKT_HANDLED;
 }

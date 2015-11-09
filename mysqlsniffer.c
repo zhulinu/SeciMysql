@@ -51,11 +51,12 @@ struct bpf_program fp;
 char   filter_exp[11] = "port ";
 u_int  total_mysql_pkts;
 u_int  total_mysql_bytes;
+char strmsg[10000]="";
 
 /*
   Function protos
 */
-// General 
+// General
 void show_help(void);
 void proc_ops(int argc, char *argv[]);
 void handle_ctrl_c(int signo);
@@ -234,7 +235,7 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
 {
    char origin = 0;
    const struct sniff_ethernet *ethernet;
-   const struct sniff_ip *ip;
+   const struct sniff_ip *ip,*ip_temp;
    const struct sniff_tcp *tcp;
    const u_char *mysql;
    u_int size_ip;
@@ -249,9 +250,9 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
    }
 
    ethernet   = (struct sniff_ethernet*)(packet);
-	ip         = (struct sniff_ip*)(packet + SIZE_ETHERNET);
+   ip         = (struct sniff_ip*)(packet + SIZE_ETHERNET);
    size_ip    = IP_HL(ip) * 4;
-	tcp        = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
+   tcp        = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
    size_tcp   = TH_OFF(tcp) * 4;
    mysql      = (packet + SIZE_ETHERNET + size_ip + size_tcp);
    size_mysql = ntohs(ip->ip_len) - size_ip - size_tcp;
@@ -268,6 +269,11 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
       }
       else {
          printf("%s.%d > server: ", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport));
+         memset(strmsg,0,sizeof(char)*10000);
+         const char *str = inet_ntoa(ip->ip_dst);
+         char ipdst[20] = "";
+         sprintf(ipdst, "%s",str);
+         sprintf(strmsg, "src=%s sport=%d dst=%s dport=%d ", inet_ntoa(ip->ip_src), ntohs(tcp->th_sport),ipdst, ntohs(tcp->th_dport));
          tag = get_tag((u_int)ip->ip_src.s_addr, tcp->th_sport);
          if(!tag) {
             printf("Out of tracking tags; can't track any more connections.\n");
@@ -313,7 +319,7 @@ void proc_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *p
   MySQL packet processing
 */
 
-/* 
+/*
   MySQL will send N amount of logical packets in one physical packet. Each
   logical packet starts with a MySQL header which says how long that logical
   pkt is minus the header itself (m->pkt_length). Along w/ the total length of
